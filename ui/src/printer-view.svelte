@@ -377,7 +377,9 @@
 
     <Card class="lg:col-span-7">
       <CardHeader class="pb-2">
-        <CardTitle class="text-sm">{t('printerHawk.table.stage1')}</CardTitle>
+        <CardTitle class="text-sm">
+          {t('printerHawk.labels.recentChecks')}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {#if printerChecks.length === 0}
