@@ -38,8 +38,8 @@ func DefaultParams() Params {
 // Snapshot exposes tracker diagnostics for API/UI status views.
 type Snapshot struct {
 	Active          bool     `json:"active"`
-	ConfirmedZ      *float64 `json:"confirmed_z"`
-	CandidateZ      *float64 `json:"candidate_z"`
+	ConfirmedZ      *float64 `json:"confirmed_z,omitempty"`
+	CandidateZ      *float64 `json:"candidate_z,omitempty"`
 	LayerCount      int      `json:"layer_count"`
 	LastCheckAgoSec *float64 `json:"last_check_ago_sec,omitempty"`
 }

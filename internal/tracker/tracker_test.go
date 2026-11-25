@@ -1,6 +1,10 @@
 package tracker
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 func fptr(v float64) *float64 { return &v }
 
@@ -110,5 +114,20 @@ func TestRebaselinesDownwardFromHeatupParkHeight(t *testing.T) {
 	}
 	if trig := tr.CheckTimerFallback(101); trig == nil || trig.Source != "timer_fallback" {
 		t.Fatalf("expected timer_fallback after 60s, got %+v", trig)
+	}
+}
+
+func TestSnapshotOmitsNilFieldsInJSON(t *testing.T) {
+	tr := New(DefaultParams())
+	raw, err := json.Marshal(tr.Snapshot(0))
+	if err != nil {
+		t.Fatalf("marshal snapshot: %v", err)
+	}
+	text := string(raw)
+	if strings.Contains(text, "null") {
+		t.Fatalf("expected nil pointer fields omitted from JSON, got %s", text)
+	}
+	if strings.Contains(text, "confirmed_z") || strings.Contains(text, "candidate_z") {
+		t.Fatalf("expected confirmed_z and candidate_z omitted when nil, got %s", text)
 	}
 }

@@ -183,13 +183,13 @@
   );
   const emptyDash = $derived(t('printerHawk.labels.emptyDash'));
   const zText = $derived(
-    printer.z !== undefined
+    typeof printer.z === 'number'
       ? `${printer.z.toFixed(2)} ${t('printerHawk.labels.mmUnit')}`
       : emptyDash,
   );
   const layerStr = $derived(String(printer.tracker.layer_count));
   const baseText = $derived(
-    printer.tracker.confirmed_z !== undefined
+    typeof printer.tracker.confirmed_z === 'number'
       ? ` (${t('printerHawk.labels.layerPrefix')} ${layerStr}, ${t('printerHawk.labels.basePrefix')} ${printer.tracker.confirmed_z.toFixed(2)} ${t('printerHawk.labels.mmUnit')})`
       : ` (${t('printerHawk.labels.layerPrefix')} ${layerStr})`,
   );
