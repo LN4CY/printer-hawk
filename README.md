@@ -66,6 +66,8 @@ docker compose restart prusa-connect
 
 ### 1. Monitor Tab (and Per-Printer Tab)
 
+![Printer Hawk Monitor tab](docs/images/monitor.png)
+
 The **Monitor** tab (and the **Printer Hawk** tab inside each individual printer page) gives live operational control and check history:
 
 - **Top Action Buttons:**
@@ -83,6 +85,8 @@ The **Monitor** tab (and the **Printer Hawk** tab inside each individual printer
 ---
 
 ### 2. AI Providers & Automatic Failover
+
+![Printer Hawk AI Providers tab](docs/images/ai-providers.png)
 
 The **AI Providers** tab lets you configure up to 4 independent slots. When a **Primary** slot times out or fails, Printer Hawk automatically fails over to its **Fallback** slot on the same check cycle:
 
@@ -115,6 +119,8 @@ Saved API keys are stored only on the server (`<data_dir>/settings.json`, `0600`
 ---
 
 ### 3. Printer Settings, Z-Layer Tuning & MQTT
+
+![Printer Hawk Printer Settings tab](docs/images/printer-settings.png)
 
 In **Printer Settings**, choose **Default Settings for New Printers** or select an individual printer from **Target Printer** to customize its behavior:
 
