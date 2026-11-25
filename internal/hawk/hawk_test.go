@@ -210,3 +210,74 @@ func mustStr(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }
+
+func TestStartInspectAsync(t *testing.T) {
+	imgBytes := testJPEG(200, 120, 40)
+	camSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write(imgBytes)
+	}))
+	defer camSrv.Close()
+
+	aiStarted := make(chan struct{})
+	aiRelease := make(chan struct{})
+	aiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		close(aiStarted)
+		<-aiRelease
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":{"content":"{\"status\":\"ok\",\"confidence\":0.98,\"defect\":\"none\",\"reason\":\"Bed clean\"}"}}`))
+	}))
+	defer aiSrv.Close()
+
+	devs := &fakeDevices{dev: deviceapi.Device{
+		ID:        "p1",
+		Name:      "CORE ONE",
+		Connected: true,
+		State:     map[string]json.RawMessage{"/state": json.RawMessage(`"IDLE"`)},
+	}}
+	svc := New(devs, &fakeStorage{}, nil, nil, t.TempDir(), nil)
+	cfg := config.FromManifest(config.DefaultManifestSettings())
+	cfg.Stage1Primary = config.ProviderSlot{
+		Provider:          config.ProviderOllama,
+		BaseURL:           aiSrv.URL,
+		Model:             "gemma4:26b",
+		ConnectTimeoutSec: 2,
+		ReadTimeoutSec:    10,
+	}
+	cfg.DefaultPrinter.CameraMode = config.CameraModeURL
+	cfg.DefaultPrinter.LiveFrameURL = camSrv.URL
+	svc.Configure(cfg)
+	svc.Tick(context.Background())
+
+	if _, err := svc.StartInspect("missing", false); err == nil {
+		t.Fatal("expected error for unknown printer")
+	}
+
+	started, err := svc.StartInspect("p1", false)
+	if err != nil || !started {
+		t.Fatalf("expected StartInspect started=true, got started=%v err=%v", started, err)
+	}
+	<-aiStarted
+
+	startedAgain, err := svc.StartInspect("p1", false)
+	if err != nil || startedAgain {
+		t.Fatalf("expected duplicate StartInspect to return started=false, got %v err=%v", startedAgain, err)
+	}
+	if st := svc.Status("p1"); len(st.Printers) != 1 || !st.Printers[0].Inspecting {
+		t.Fatalf("expected Inspecting=true while AI call in flight: %+v", st.Printers)
+	}
+
+	close(aiRelease)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		st := svc.Status("p1")
+		if len(st.Printers) == 1 && !st.Printers[0].Inspecting && st.Printers[0].LastCheck != nil {
+			if st.Printers[0].LastCheck.Stage1.Status != "ok" {
+				t.Fatalf("unexpected stage1 status: %+v", st.Printers[0].LastCheck)
+			}
+			return
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for async StartInspect completion")
+}

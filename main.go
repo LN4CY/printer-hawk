@@ -295,15 +295,23 @@ func buildRoutes(svc *hawk.Service, access AccessChecker) http.Handler {
 	})
 
 	mux.HandleFunc("POST /printers/{printer}/inspect", func(w http.ResponseWriter, r *http.Request) {
+		if svc == nil {
+			refuse(w, r, CommandRejected.New("service not initialized").With(fault.StringParam("reason", "not configured")))
+			return
+		}
 		printerID := r.PathValue("printer")
 		v := strings.ToLower(r.URL.Query().Get("verify"))
 		verify := v == "1" || v == "true" || v == "yes"
-		rec, err := svc.Inspect(r.Context(), printerID, verify)
+		started, err := svc.StartInspect(printerID, verify)
 		if err != nil {
-			refuse(w, r, InspectionFailed.New(err.Error()).With(fault.StringParam("reason", err.Error())))
+			refuse(w, r, PrinterNotFound.New(err.Error()).With(fault.StringParam("printer", printerID)))
 			return
 		}
-		answerJSON(w, http.StatusOK, rec)
+		detail := "Inspection already in progress"
+		if started {
+			detail = "Inspection started"
+		}
+		answerJSON(w, http.StatusOK, map[string]any{"ok": true, "printer": printerID, "detail": detail})
 	})
 
 	mux.HandleFunc("POST /printers/{printer}/false-alarm", func(w http.ResponseWriter, r *http.Request) {

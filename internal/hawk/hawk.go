@@ -112,6 +112,7 @@ type PrinterSummary struct {
 	LastError           string               `json:"last_error,omitempty"`
 	HasLiveSource       bool                 `json:"has_live_source"`
 	HasAnalyzedFrame    bool                 `json:"has_analyzed_frame"`
+	Inspecting          bool                 `json:"inspecting"`
 	LastCheck           *CheckRecord         `json:"last_check,omitempty"`
 }
 
@@ -145,6 +146,7 @@ type printerState struct {
 	pausedForJob        bool
 	consecutiveWarnings int
 	lastError           string
+	inspecting          bool
 	lastCheck           *CheckRecord
 	lastMQTTPrinting    *bool
 }
@@ -512,6 +514,44 @@ func (s *Service) Inspect(ctx context.Context, printerID string, verify bool) (C
 	return s.runInspection(ctx, printerID, cfg, pc, trig, false, verify)
 }
 
+// StartInspect triggers an asynchronous dry-run inspection so HTTP routes never hit
+// Prusa Connect Local's 10-second routes.serve budget on slow VLM calls.
+func (s *Service) StartInspect(printerID string, verify bool) (bool, error) {
+	s.mu.Lock()
+	ps, ok := s.printers[printerID]
+	if !ok {
+		s.mu.Unlock()
+		return false, fmt.Errorf("unknown printer %q", printerID)
+	}
+	if ps.inspecting {
+		s.mu.Unlock()
+		return false, nil
+	}
+	ps.inspecting = true
+	ps.lastError = ""
+	s.mu.Unlock()
+
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			if cur, exists := s.printers[printerID]; exists {
+				cur.inspecting = false
+			}
+			s.mu.Unlock()
+		}()
+		bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		if _, err := s.Inspect(bgCtx, printerID, verify); err != nil {
+			s.setPrinterError(printerID, err.Error())
+			if s.log != nil {
+				s.log.Warn("manual inspection failed", "printer", printerID, "verify", verify, "error", err)
+			}
+		}
+	}()
+
+	return true, nil
+}
+
 // FalseAlarm clears active alerts/latches AND promotes the latest analyzed frame as the new clean baseline.
 func (s *Service) FalseAlarm(printerID string) (bool, error) {
 	s.mu.Lock()
@@ -660,6 +700,7 @@ func (s *Service) Status(printerFilter string) StatusPayload {
 			LastError:           ps.lastError,
 			HasLiveSource:       pc.LiveFrameURL != "" || ps.lastShot.Path != "",
 			HasAnalyzedFrame:    len(ps.lastAnalyzedJPG) > 0,
+			Inspecting:          ps.inspecting,
 			LastCheck:           ps.lastCheck,
 		}
 		printers = append(printers, summary)

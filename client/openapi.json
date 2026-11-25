@@ -403,6 +403,9 @@
           "has_analyzed_frame": {
             "type": "boolean"
           },
+          "inspecting": {
+            "type": "boolean"
+          },
           "last_check": {
             "$ref": "#/components/schemas/CheckRecord"
           }
@@ -418,7 +421,8 @@
           "paused_for_job",
           "consecutive_warnings",
           "has_live_source",
-          "has_analyzed_frame"
+          "has_analyzed_frame",
+          "inspecting"
         ]
       },
       "StatusPayload": {
@@ -621,11 +625,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Check result record.",
+            "description": "Dry-run inspection started in the background.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CheckRecord"
+                  "$ref": "#/components/schemas/ActionResult"
                 }
               }
             }

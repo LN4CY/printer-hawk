@@ -324,6 +324,7 @@ export interface components {
             last_error?: string;
             has_live_source: boolean;
             has_analyzed_frame: boolean;
+            inspecting: boolean;
             last_check?: components["schemas"]["CheckRecord"];
         };
         StatusPayload: {
@@ -432,13 +433,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Check result record. */
+            /** @description Dry-run inspection started in the background. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CheckRecord"];
+                    "application/json": components["schemas"]["ActionResult"];
                 };
             };
         };

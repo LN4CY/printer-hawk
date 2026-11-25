@@ -266,6 +266,9 @@ func TestProvider(ctx context.Context, slot config.ProviderSlot) (map[string]any
 	if !slotConfigured(slot) {
 		return nil, errors.New("provider slot is not configured (provider=none or missing model)")
 	}
+	// Keep provider connectivity checks safely inside Prusa Connect Local's 10s routes.serve budget.
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
 	client := httpClientFor(slot)
 	t0 := time.Now()
 

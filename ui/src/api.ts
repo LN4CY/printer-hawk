@@ -45,7 +45,7 @@ export const hawkOn = (host: ModuleHost) => {
       printer: string,
       verify: boolean,
       signal?: AbortSignal,
-    ): Promise<CheckRecord> =>
+    ): Promise<ActionResult> =>
       routes.inspectPrinter({ path: { printer }, query: { verify } }, signal),
 
     falseAlarm: (

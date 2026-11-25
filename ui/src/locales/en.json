@@ -39,6 +39,7 @@
   "printerHawk.labels.noPrinters": "No printers discovered yet. Add or connect a printer in Prusa Connect.",
   "printerHawk.labels.noChecks": "No vision inspections recorded yet.",
   "printerHawk.labels.recentChecks": "Recent Checks",
+  "printerHawk.labels.inspecting": "Running AI inspection...",
   "printerHawk.labels.selectFrameHint": "Stored frame snapshot",
   "printerHawk.labels.layerPrefix": "Layer",
   "printerHawk.labels.basePrefix": "base",

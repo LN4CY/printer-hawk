@@ -169,10 +169,10 @@
         ],
         "responses": {
           "200": {
-            "description": "Check result record.",
+            "description": "Dry-run inspection started in the background.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/CheckRecord" }
+                "schema": { "$ref": "#/components/schemas/ActionResult" }
               }
             }
           }
@@ -442,9 +442,10 @@
           "last_error": { "type": "string" },
           "has_live_source": { "type": "boolean" },
           "has_analyzed_frame": { "type": "boolean" },
+          "inspecting": { "type": "boolean" },
           "last_check": { "$ref": "#/components/schemas/CheckRecord" }
         },
-        "required": ["id", "name", "connected", "state", "config", "tracker", "alert_active", "paused_for_job", "consecutive_warnings", "has_live_source", "has_analyzed_frame"]
+        "required": ["id", "name", "connected", "state", "config", "tracker", "alert_active", "paused_for_job", "consecutive_warnings", "has_live_source", "has_analyzed_frame", "inspecting"]
       },
       "StatusPayload": {
         "type": "object",

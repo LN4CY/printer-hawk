@@ -135,6 +135,14 @@
     return () => clearTimer();
   });
 
+  $effect(() => {
+    if (!printer.inspecting) return;
+    const poll = setInterval(() => {
+      if (!document.hidden && !host.signal.aborted) void onChanged();
+    }, 1500);
+    return () => clearInterval(poll);
+  });
+
   onDestroy(() => {
     clearTimer();
     replaceFrameSrc(undefined);
@@ -213,6 +221,13 @@
   {#if fault}
     <FaultAlert {fault} />
   {/if}
+  {#if printer.inspecting}
+    <div
+      class="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+    >
+      {t('printerHawk.labels.inspecting')}
+    </div>
+  {/if}
   {#if notice}
     <div
       class="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
@@ -223,7 +238,7 @@
 
   <div class="flex flex-wrap items-center gap-2">
     <Button
-      disabled={busy}
+      disabled={busy || printer.inspecting}
       onclick={() =>
         runAction(() => service.inspect(printer.id, false, host.signal))}
     >
@@ -231,7 +246,7 @@
     </Button>
     <Button
       variant="secondary"
-      disabled={busy}
+      disabled={busy || printer.inspecting}
       onclick={() =>
         runAction(() => service.inspect(printer.id, true, host.signal))}
     >
@@ -332,7 +347,7 @@
   {/if}
 
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
-    <Card class="lg:col-span-5">
+    <Card class="lg:col-span-4">
       <CardHeader
         class="flex flex-row flex-wrap items-center justify-between gap-2 pb-2"
       >
@@ -412,7 +427,7 @@
       </CardContent>
     </Card>
 
-    <Card class="lg:col-span-7">
+    <Card class="lg:col-span-8">
       <CardHeader class="pb-2">
         <CardTitle class="text-sm">
           {t('printerHawk.labels.recentChecks')}
@@ -427,51 +442,76 @@
           <Table class="text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead>{t('printerHawk.table.time')}</TableHead>
-                <TableHead>{t('printerHawk.table.trigger')}</TableHead>
-                <TableHead>{t('printerHawk.table.stage1')}</TableHead>
-                <TableHead>{t('printerHawk.table.stage2')}</TableHead>
-                <TableHead>{t('printerHawk.table.action')}</TableHead>
-                <TableHead>{t('printerHawk.table.frame')}</TableHead>
+                <TableHead class="px-2">
+                  {t('printerHawk.table.time')}
+                </TableHead>
+                <TableHead class="px-2">
+                  {t('printerHawk.table.trigger')}
+                </TableHead>
+                <TableHead class="px-2">
+                  {t('printerHawk.table.stage1')}
+                </TableHead>
+                <TableHead class="px-2">
+                  {t('printerHawk.table.stage2')}
+                </TableHead>
+                <TableHead class="px-2">
+                  {t('printerHawk.table.action')}
+                </TableHead>
+                <TableHead class="px-2">
+                  {t('printerHawk.table.frame')}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {#each printerChecks as rec (rec.id)}
                 <TableRow>
-                  <TableCell class="font-mono">
+                  <TableCell class="px-2 py-2 align-top font-mono">
                     {rec.ts.slice(11, 19)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell class="px-2 py-2 align-top">
                     <div>{rec.trigger}</div>
                     <div class="text-muted-foreground">{rec.image_source}</div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell
+                    class="max-w-xs px-2 py-2 align-top whitespace-normal"
+                  >
                     <Badge variant={stageBadgeVariant(rec.stage1)}>
                       {rec.stage1.status}
                     </Badge>
-                    <div class="mt-1 font-mono text-muted-foreground">
+                    <div class="mt-1 font-mono break-all text-muted-foreground">
                       {rec.stage1.provider} · {rec.stage1.model}
                       {#if rec.stage1.fallback_from}
                         ({t('printerHawk.labels.fallbackTag')}
                         {rec.stage1.fallback_from})
                       {/if}
                     </div>
-                    <div class="mt-1 text-foreground">{rec.stage1.reason}</div>
+                    <div class="mt-1 break-words text-foreground">
+                      {rec.stage1.reason}
+                    </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell
+                    class="max-w-xs px-2 py-2 align-top whitespace-normal"
+                  >
                     {#if rec.stage2}
                       <Badge variant={stageBadgeVariant(rec.stage2)}>
                         {rec.stage2.status}
                       </Badge>
-                      <div class="mt-1 font-mono text-muted-foreground">
+                      <div
+                        class="mt-1 font-mono break-all text-muted-foreground"
+                      >
                         {rec.stage2.provider} · {rec.stage2.model}
+                      </div>
+                      <div class="mt-1 break-words text-foreground">
+                        {rec.stage2.reason}
                       </div>
                     {:else}
                       {emptyDash}
                     {/if}
                   </TableCell>
-                  <TableCell class="font-mono">{rec.action}</TableCell>
-                  <TableCell>
+                  <TableCell class="px-2 py-2 align-top font-mono">
+                    {rec.action}
+                  </TableCell>
+                  <TableCell class="px-2 py-2 align-top">
                     {#if rec.frame_id}
                       <Button
                         size="compact"
