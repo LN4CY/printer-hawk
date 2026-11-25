@@ -1,0 +1,217 @@
+# Printer Hawk manifest for Prusa Connect Local.
+# Namespace derived from github.com/LN4CY/printer-hawk:
+#   com.github.aux.ln4cy.printer-hawk
+
+name: printer-hawk
+title: Printer Hawk
+summary: Configurable dual-stage Vision-Language Model print failure guard with per-printer tracking, live frames, and local or cloud failover.
+codeowner: LN4CY
+kind: sink
+version: 0.1.0
+license: MIT
+contract_major: 1
+openapi: openapi.json
+
+platforms:
+  - linux_amd64
+  - linux_arm64
+  - darwin_arm64
+  - windows_amd64
+
+require:
+  core: ">=0.1.0-beta.1"
+  core-device.list: "*"
+  core-device.get: "*"
+  core-device.command: "*"
+  core-bus.subscribe: "*"
+  core-bus.emit: "*"
+  core-storage.read: "*"
+  core-access.check: "*"
+
+needs:
+  data: true
+  memory_mib: 128
+
+permissions:
+  - observe
+  - read_storage
+  - operate
+
+checks:
+  - operate_resource
+
+events:
+  failure: failure.detected
+
+egress:
+  - host: generativelanguage.googleapis.com
+    from: process
+    ports: [443]
+    why: Calls Google Gemini when Gemini is selected for Stage 1 or Stage 2 screening or failover.
+    sends: Resized camera JPEG snapshots, printer telemetry context, and the Gemini API key.
+  - host: api.anthropic.com
+    from: process
+    ports: [443]
+    why: Calls Anthropic Claude when Claude is selected for Stage 1 or Stage 2 confirmation.
+    sends: Resized camera JPEG snapshots, printer telemetry context, and the Anthropic API key.
+  - host: api.openai.com
+    from: process
+    ports: [443]
+    why: Calls OpenAI when OpenAI-compatible mode targets the official OpenAI API.
+    sends: Resized camera JPEG snapshots, printer telemetry context, and the API key.
+  - host: openrouter.ai
+    from: process
+    ports: [443]
+    why: Calls OpenRouter when OpenAI-compatible mode targets OpenRouter.
+    sends: Resized camera JPEG snapshots, printer telemetry context, and the API key.
+  - option: stage1_base_url
+    from: process
+    ports: [80, 443, 1234, 8000, 8080, 11434]
+    why: Connects to the operator's LAN Ollama or OpenAI-compatible endpoint configured for Stage 1.
+    sends: Resized camera JPEG snapshots, telemetry context, and optional API key.
+  - option: stage1_fallback_base_url
+    from: process
+    ports: [80, 443, 1234, 8000, 8080, 11434]
+    why: Connects to the operator's Stage 1 fallback AI endpoint if primary fails.
+    sends: Resized camera JPEG snapshots, telemetry context, and optional API key.
+  - option: stage2_base_url
+    from: process
+    ports: [80, 443, 1234, 8000, 8080, 11434]
+    why: Connects to the operator's Stage 2 confirmation AI endpoint.
+    sends: Resized camera JPEG snapshots, telemetry context, and optional API key.
+  - option: stage2_fallback_base_url
+    from: process
+    ports: [80, 443, 1234, 8000, 8080, 11434]
+    why: Connects to the operator's Stage 2 fallback AI endpoint if primary fails.
+    sends: Resized camera JPEG snapshots, telemetry context, and optional API key.
+  - option: live_frame_url
+    from: process
+    ports: [80, 443, 1984, 5000, 8080, 8091]
+    why: Optional direct live JPEG snapshot URL (for example local go2rtc or camera HTTP snapshot).
+    sends: HTTP GET requests for the current JPEG frame.
+  - option: mqtt_host
+    from: process
+    ports: [1883]
+    why: Optional smart-home alert publishing to a local MQTT broker.
+    sends: Printer monitoring state, alert state, and check status JSON payloads.
+
+options:
+  - key: page_setup
+    type: bool
+    default: "true"
+    summary: Allow operators with operate permission to configure AI providers, API keys, and per-printer settings from the web UI.
+  - key: stage1_provider
+    type: string
+    default: "none"
+    summary: "Stage 1 primary provider: none, ollama, gemini, anthropic, or openai_compat."
+  - key: stage1_base_url
+    type: string
+    default: ""
+    summary: Base URL for Stage 1 primary provider (for example http://192.168.1.50:11434 for Ollama).
+  - key: stage1_model
+    type: string
+    default: ""
+    summary: Model name for Stage 1 primary screening (for example gemma4:26b or gemini-3.8-flash).
+  - key: stage1_api_key
+    type: secret
+    default: ""
+    summary: API key for Stage 1 primary provider, when required.
+  - key: stage1_think
+    type: bool
+    default: "false"
+    summary: Enable extended reasoning mode on Stage 1 Ollama models.
+  - key: stage1_fallback_provider
+    type: string
+    default: "none"
+    summary: "Stage 1 automatic fallback provider: none, ollama, gemini, anthropic, or openai_compat."
+  - key: stage1_fallback_base_url
+    type: string
+    default: ""
+    summary: Base URL for Stage 1 fallback provider (leave empty for default cloud endpoint).
+  - key: stage1_fallback_model
+    type: string
+    default: ""
+    summary: Model name for Stage 1 fallback provider.
+  - key: stage1_fallback_api_key
+    type: secret
+    default: ""
+    summary: API key for Stage 1 fallback provider, when required.
+  - key: stage2_provider
+    type: string
+    default: "none"
+    summary: "Stage 2 conservative pause-confirmation provider: none, ollama, gemini, anthropic, or openai_compat."
+  - key: stage2_base_url
+    type: string
+    default: ""
+    summary: Base URL for Stage 2 primary provider.
+  - key: stage2_model
+    type: string
+    default: ""
+    summary: Model name for Stage 2 primary confirmation (for example claude-sonnet-5-5).
+  - key: stage2_api_key
+    type: secret
+    default: ""
+    summary: API key for Stage 2 primary provider, when required.
+  - key: stage2_think
+    type: bool
+    default: "true"
+    summary: Enable reasoning mode on Stage 2 Ollama models.
+  - key: stage2_fallback_provider
+    type: string
+    default: "none"
+    summary: "Stage 2 automatic fallback provider: none, ollama, gemini, anthropic, or openai_compat."
+  - key: stage2_fallback_base_url
+    type: string
+    default: ""
+    summary: Base URL for Stage 2 fallback provider.
+  - key: stage2_fallback_model
+    type: string
+    default: ""
+    summary: Model name for Stage 2 fallback provider.
+  - key: stage2_fallback_api_key
+    type: secret
+    default: ""
+    summary: API key for Stage 2 fallback provider, when required.
+  - key: stage2_fallback_think
+    type: bool
+    default: "true"
+    summary: Enable reasoning mode on Stage 2 fallback Ollama models.
+  - key: default_action
+    type: string
+    default: "notify"
+    summary: Default action when a failure is confirmed for newly discovered printers (notify or pause).
+  - key: live_frame_url
+    type: string
+    default: ""
+    summary: Optional default live JPEG URL (such as go2rtc http://127.0.0.1:1984/api/frame.jpeg?src=coreone).
+  - key: warmup_seconds
+    type: number
+    default: "45"
+    summary: Seconds to wait after a print starts before locking Z baseline.
+  - key: fallback_max_wait_s
+    type: number
+    default: "60"
+    summary: Maximum seconds between checks during long single layers.
+  - key: mqtt_host
+    type: string
+    default: ""
+    summary: Optional MQTT broker hostname/IP for smart-home notifications (empty disables MQTT).
+  - key: mqtt_port
+    type: int
+    default: "1883"
+    summary: Optional MQTT broker TCP port.
+  - key: mqtt_prefix
+    type: string
+    default: "prusa/printer-hawk"
+    summary: MQTT topic prefix for published state and alerts.
+
+ui:
+  entry: ui/index.js
+  library: ">=0.0.1 <1.0.0"
+  contributes:
+    pages:
+      - path: printer-hawk
+        title: Printer Hawk
+    device_tab:
+      - id: printer-hawk
+        title: Printer Hawk

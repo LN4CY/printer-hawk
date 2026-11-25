@@ -1,0 +1,829 @@
+{
+  "components": {
+    "schemas": {
+      "ProviderSlot": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "base_url": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "api_key": {
+            "type": "string"
+          },
+          "think": {
+            "type": "boolean"
+          },
+          "connect_timeout_sec": {
+            "type": "number"
+          },
+          "read_timeout_sec": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "provider",
+          "base_url",
+          "model",
+          "api_key",
+          "think",
+          "connect_timeout_sec",
+          "read_timeout_sec"
+        ]
+      },
+      "PrinterConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string"
+          },
+          "camera_mode": {
+            "type": "string"
+          },
+          "live_frame_url": {
+            "type": "string"
+          },
+          "warmup_seconds": {
+            "type": "number"
+          },
+          "z_min_step_mm": {
+            "type": "number"
+          },
+          "z_max_step_mm": {
+            "type": "number"
+          },
+          "z_settle_seconds": {
+            "type": "number"
+          },
+          "min_check_interval_sec": {
+            "type": "number"
+          },
+          "fallback_max_wait_sec": {
+            "type": "number"
+          },
+          "stage1_fail_threshold": {
+            "type": "number"
+          },
+          "stage1_warn_escalate_count": {
+            "type": "integer"
+          },
+          "stage2_pause_threshold": {
+            "type": "number"
+          },
+          "custom_prompt_notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "action",
+          "camera_mode",
+          "live_frame_url",
+          "warmup_seconds",
+          "z_min_step_mm",
+          "z_max_step_mm",
+          "z_settle_seconds",
+          "min_check_interval_sec",
+          "fallback_max_wait_sec",
+          "stage1_fail_threshold",
+          "stage1_warn_escalate_count",
+          "stage2_pause_threshold",
+          "custom_prompt_notes"
+        ]
+      },
+      "MQTTConfig": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "prefix": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "prefix"
+        ]
+      },
+      "RuntimeConfig": {
+        "type": "object",
+        "properties": {
+          "page_setup": {
+            "type": "boolean"
+          },
+          "stage1_primary": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "stage1_fallback": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "stage2_primary": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "stage2_fallback": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "max_image_width": {
+            "type": "integer"
+          },
+          "jpeg_quality": {
+            "type": "integer"
+          },
+          "max_history_frames": {
+            "type": "integer"
+          },
+          "mqtt": {
+            "$ref": "#/components/schemas/MQTTConfig"
+          },
+          "default_printer": {
+            "$ref": "#/components/schemas/PrinterConfig"
+          },
+          "printers": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PrinterConfig"
+            }
+          }
+        },
+        "required": [
+          "page_setup",
+          "stage1_primary",
+          "stage1_fallback",
+          "stage2_primary",
+          "stage2_fallback",
+          "max_image_width",
+          "jpeg_quality",
+          "max_history_frames",
+          "mqtt",
+          "default_printer",
+          "printers"
+        ]
+      },
+      "ProviderTestRequest": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          }
+        },
+        "required": [
+          "slot",
+          "config"
+        ]
+      },
+      "ProviderTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "latency_ms": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "latency_ms",
+          "detail"
+        ]
+      },
+      "StageResult": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "defect": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "confirm_pause": {
+            "type": "boolean"
+          },
+          "think": {
+            "type": "boolean"
+          },
+          "latency_ms": {
+            "type": "integer"
+          },
+          "fallback_from": {
+            "type": "string"
+          },
+          "primary_error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "status",
+          "confidence",
+          "defect",
+          "reason",
+          "latency_ms"
+        ]
+      },
+      "CheckRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "printer_id": {
+            "type": "string"
+          },
+          "printer_name": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "image_source": {
+            "type": "string"
+          },
+          "frame_id": {
+            "type": "string"
+          },
+          "z": {
+            "type": "number"
+          },
+          "layer": {
+            "type": "integer"
+          },
+          "printer_state": {
+            "type": "string"
+          },
+          "stage1": {
+            "$ref": "#/components/schemas/StageResult"
+          },
+          "stage2": {
+            "$ref": "#/components/schemas/StageResult"
+          },
+          "action": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "pause_error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "printer_id",
+          "printer_name",
+          "trigger",
+          "image_source",
+          "layer",
+          "printer_state",
+          "stage1",
+          "action",
+          "dry_run"
+        ]
+      },
+      "TrackerSnapshot": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "confirmed_z": {
+            "type": "number"
+          },
+          "candidate_z": {
+            "type": "number"
+          },
+          "layer_count": {
+            "type": "integer"
+          },
+          "last_check_ago_sec": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "active",
+          "layer_count"
+        ]
+      },
+      "PrinterSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "z": {
+            "type": "number"
+          },
+          "bed_temp": {
+            "type": "number"
+          },
+          "bed_target": {
+            "type": "number"
+          },
+          "nozzle_temp": {
+            "type": "number"
+          },
+          "nozzle_target": {
+            "type": "number"
+          },
+          "job_progress": {
+            "type": "number"
+          },
+          "job_path": {
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/PrinterConfig"
+          },
+          "tracker": {
+            "$ref": "#/components/schemas/TrackerSnapshot"
+          },
+          "alert_active": {
+            "type": "boolean"
+          },
+          "paused_for_job": {
+            "type": "boolean"
+          },
+          "consecutive_warnings": {
+            "type": "integer"
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "has_live_source": {
+            "type": "boolean"
+          },
+          "has_analyzed_frame": {
+            "type": "boolean"
+          },
+          "last_check": {
+            "$ref": "#/components/schemas/CheckRecord"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "connected",
+          "state",
+          "config",
+          "tracker",
+          "alert_active",
+          "paused_for_job",
+          "consecutive_warnings",
+          "has_live_source",
+          "has_analyzed_frame"
+        ]
+      },
+      "StatusPayload": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "page_setup": {
+            "type": "boolean"
+          },
+          "mqtt_enabled": {
+            "type": "boolean"
+          },
+          "mqtt_last_error": {
+            "type": "string"
+          },
+          "stage1_primary": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "stage1_fallback": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "stage2_primary": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "stage2_fallback": {
+            "$ref": "#/components/schemas/ProviderSlot"
+          },
+          "printers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrinterSummary"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckRecord"
+            }
+          }
+        },
+        "required": [
+          "service",
+          "page_setup",
+          "mqtt_enabled",
+          "stage1_primary",
+          "stage1_fallback",
+          "stage2_primary",
+          "stage2_fallback",
+          "printers",
+          "history"
+        ]
+      },
+      "ActionResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "printer": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "printer"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "printer-hawk",
+    "version": "0.1.0",
+    "description": "Printer Hawk API for dual-stage VLM failure monitoring, camera live views, historical frame inspection, and configurable AI provider settings."
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/clear": {
+      "post": {
+        "operationId": "clear-alert",
+        "summary": "Clear alert state and pause latch",
+        "description": "Resets the printer's active failure alert, consecutive warning counter, and per-job pause latch.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert cleared.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/false-alarm": {
+      "post": {
+        "operationId": "mark-false-alarm",
+        "summary": "Clear alert and promote latest frame as clean baseline",
+        "description": "Clears active failure alerts and pause latches for the printer and accepts the latest analyzed bed frame as the new clean baseline.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Baseline accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/frames/{frameId}.jpg": {
+      "get": {
+        "operationId": "get-stored-frame",
+        "summary": "Stored JPEG frame from a previous AI check",
+        "description": "Serves one retained JPEG snapshot captured during a previous AI vision check for inspection.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "frameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored JPEG frame.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/inspect": {
+      "post": {
+        "operationId": "inspect-printer",
+        "summary": "Run dry-run AI inspection on one printer",
+        "description": "Triggers an on-demand dry-run Stage 1 (and optional Stage 2 when verify=true) inspection without pausing the printer.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "verify",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Check result record.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckRecord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/live.jpg": {
+      "get": {
+        "operationId": "get-live-frame",
+        "summary": "Latest live camera JPEG for one printer",
+        "description": "Fetches a briefly cached live JPEG frame from the configured live JPEG URL or Prusa Connect snapshot storage.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JPEG camera frame.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/pause": {
+      "post": {
+        "operationId": "pause-printer",
+        "summary": "Send pause command to a printing printer",
+        "description": "Verifies operator permission and sends core.command.pause_print to the specified printer.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pause command acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/stop": {
+      "post": {
+        "operationId": "stop-printer",
+        "summary": "Send stop command to an active or paused printer",
+        "description": "Verifies operator permission and sends core.command.stop_print to the specified printer.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stop command acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/providers/test": {
+      "post": {
+        "operationId": "test-provider",
+        "summary": "Test connectivity to an AI provider slot",
+        "description": "Runs a lightweight connectivity check against a configured Ollama, Gemini, Anthropic Claude, or OpenAI-compatible provider slot.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider connectivity result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderTestResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/settings": {
+      "get": {
+        "operationId": "get-settings",
+        "summary": "Read global and per-printer settings",
+        "description": "Returns the active runtime configuration for Printer Hawk with stored API secrets masked.",
+        "responses": {
+          "200": {
+            "description": "Current runtime configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeConfig"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "update-settings",
+        "summary": "Save global and per-printer settings",
+        "description": "Validates, persists, and applies updated global AI provider slots, MQTT configuration, and per-printer monitoring overrides.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuntimeConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated configuration (secrets redacted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/status": {
+      "get": {
+        "operationId": "get-status",
+        "summary": "Fleet status and check history",
+        "description": "Returns redacted global AI provider settings, per-printer monitoring state, live telemetry, and recent check history.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fleet status, active providers (secrets redacted), and recent checks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
