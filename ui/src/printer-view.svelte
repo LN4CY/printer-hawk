@@ -8,6 +8,7 @@
     CardHeader,
     CardTitle,
     FaultAlert,
+    Input,
     Select,
     SelectContent,
     SelectItem,
@@ -46,6 +47,7 @@
 
   let camMode = $state<'live' | 'ai'>('live');
   let refreshRate = $state('2000');
+  let customRateSec = $state('10');
   let frameSrc = $state<string | undefined>();
   let frameTimestamp = $state('');
   let busy = $state(false);
@@ -87,9 +89,21 @@
     return undefined;
   };
 
+  const inputValue = (e: Event): string =>
+    (e.currentTarget as HTMLInputElement).value;
+
+  const effectiveRefreshMs = $derived.by(() => {
+    if (refreshRate === 'custom') {
+      const secs = Number(customRateSec);
+      if (!Number.isFinite(secs) || secs <= 0) return 0;
+      return Math.max(500, Math.round(secs * 1000));
+    }
+    return Number(refreshRate);
+  });
+
   const loadCameraFrame = async (
     mode: 'live' | 'ai',
-    rate: string,
+    intervalMs: number,
     targetId: string,
     lastFrameId?: string,
   ) => {
@@ -104,18 +118,17 @@
     } catch {
       // Keep last visible frame on transient poll failure.
     }
-    const ms = Number(rate);
-    if (mode === 'live' && ms > 0) {
+    if (mode === 'live' && intervalMs > 0) {
       timer = setTimeout(() => {
-        void loadCameraFrame(mode, rate, targetId, lastFrameId);
-      }, ms);
+        void loadCameraFrame(mode, intervalMs, targetId, lastFrameId);
+      }, intervalMs);
     }
   };
 
   $effect(() => {
     void loadCameraFrame(
       camMode,
-      refreshRate,
+      effectiveRefreshMs,
       printer.id,
       printer.last_check?.frame_id,
     );
@@ -138,7 +151,7 @@
       await onChanged();
       await loadCameraFrame(
         camMode,
-        refreshRate,
+        effectiveRefreshMs,
         printer.id,
         printer.last_check?.frame_id,
       );
@@ -175,6 +188,7 @@
     { value: '1000', label: t('printerHawk.rates.r1s') },
     { value: '2000', label: t('printerHawk.rates.r2s') },
     { value: '5000', label: t('printerHawk.rates.r5s') },
+    { value: 'custom', label: t('printerHawk.rates.custom') },
     { value: '0', label: t('printerHawk.rates.paused') },
   ]);
 
@@ -319,7 +333,9 @@
 
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
     <Card class="lg:col-span-5">
-      <CardHeader class="flex flex-row items-center justify-between gap-2 pb-2">
+      <CardHeader
+        class="flex flex-row flex-wrap items-center justify-between gap-2 pb-2"
+      >
         <div class="flex items-center gap-2">
           <Button
             size="compact"
@@ -341,16 +357,36 @@
           </Button>
         </div>
         {#if camMode === 'live'}
-          <Select items={rateItems} bind:value={refreshRate}>
-            <SelectTrigger size="sm" class="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {#each rateItems as rateOpt (rateOpt.value)}
-                <SelectItem value={rateOpt.value}>{rateOpt.label}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
+          <div class="flex items-center gap-2">
+            <Select items={rateItems} bind:value={refreshRate}>
+              <SelectTrigger size="sm" class="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {#each rateItems as rateOpt (rateOpt.value)}
+                  <SelectItem value={rateOpt.value}>{rateOpt.label}</SelectItem>
+                {/each}
+              </SelectContent>
+            </Select>
+            {#if refreshRate === 'custom'}
+              <div class="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  size="sm"
+                  class="w-20"
+                  value={customRateSec}
+                  oninput={(e: Event) => {
+                    customRateSec = inputValue(e);
+                  }}
+                />
+                <span class="text-xs text-muted-foreground">
+                  {t('printerHawk.rates.secUnit')}
+                </span>
+              </div>
+            {/if}
+          </div>
         {/if}
       </CardHeader>
       <CardContent>
