@@ -26,9 +26,9 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/wire"
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"github.com/LN4CY/printer-hawk/internal/config"
-	"github.com/LN4CY/printer-hawk/internal/hawk"
-	"github.com/LN4CY/printer-hawk/internal/vision"
+	"github.com/ln4cy/printer-hawk/internal/config"
+	"github.com/ln4cy/printer-hawk/internal/hawk"
+	"github.com/ln4cy/printer-hawk/internal/vision"
 )
 
 //go:embed module.yaml

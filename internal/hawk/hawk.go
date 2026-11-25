@@ -26,10 +26,10 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/event"
 	"github.com/prusa3d/prusa-connect/sdk/storageapi"
 
-	"github.com/LN4CY/printer-hawk/internal/config"
-	"github.com/LN4CY/printer-hawk/internal/mqtt"
-	"github.com/LN4CY/printer-hawk/internal/tracker"
-	"github.com/LN4CY/printer-hawk/internal/vision"
+	"github.com/ln4cy/printer-hawk/internal/config"
+	"github.com/ln4cy/printer-hawk/internal/mqtt"
+	"github.com/ln4cy/printer-hawk/internal/tracker"
+	"github.com/ln4cy/printer-hawk/internal/vision"
 )
 
 const (

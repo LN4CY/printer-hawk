@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LN4CY/printer-hawk/internal/config"
+	"github.com/ln4cy/printer-hawk/internal/config"
 )
 
 var fenceRe = regexp.MustCompile("(?is)```(?:json)?\\s*(\\{.*?\\})\\s*```")

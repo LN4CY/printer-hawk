@@ -17,7 +17,7 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/deviceapi"
 	"github.com/prusa3d/prusa-connect/sdk/storageapi"
 
-	"github.com/LN4CY/printer-hawk/internal/config"
+	"github.com/ln4cy/printer-hawk/internal/config"
 )
 
 func testJPEG(r, g, b uint8) []byte {

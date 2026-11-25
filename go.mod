@@ -1,4 +1,4 @@
-module github.com/LN4CY/printer-hawk
+module github.com/ln4cy/printer-hawk
 
 go 1.26.11
 
