@@ -28,17 +28,19 @@ import (
 
 	"github.com/ln4cy/printer-hawk/internal/config"
 	"github.com/ln4cy/printer-hawk/internal/mqtt"
+	"github.com/ln4cy/printer-hawk/internal/timelapse"
 	"github.com/ln4cy/printer-hawk/internal/tracker"
 	"github.com/ln4cy/printer-hawk/internal/vision"
 )
 
 const (
-	verbPause         = "core.command.pause_print"
-	verbStop          = "core.command.stop_print"
-	maxFrameBytes     = 8 << 20
-	staleSnapshotAge  = 3 * time.Minute
-	liveCacheTTL      = time.Second
-	maxHistoryRecords = 120
+	verbPause              = "core.command.pause_print"
+	verbStop               = "core.command.stop_print"
+	maxFrameBytes          = 8 << 20
+	maxTimelapseFrameBytes = 900 << 10
+	staleSnapshotAge       = 3 * time.Minute
+	liveCacheTTL           = time.Second
+	maxHistoryRecords      = 120
 )
 
 // Devices is the subset of deviceapi.Client used by Printer Hawk.
@@ -134,6 +136,9 @@ type printerState struct {
 	info                deviceapi.Device
 	telemetry           vision.Telemetry
 	tracker             *tracker.LayerTracker
+	tlTracker           *tracker.LayerTracker
+	activeTL            *timelapse.Session
+	tlLastCaptureMono   float64
 	lastShot            SnapshotEvent
 	prevJPG             []byte
 	refJPG              []byte
@@ -163,6 +168,7 @@ type Service struct {
 	clockMono func() float64
 	httpCli   *http.Client
 	mqttCli   *mqtt.Client
+	tlStore   *timelapse.Store
 
 	mu       sync.Mutex
 	cfg      config.RuntimeConfig
@@ -195,6 +201,7 @@ func New(
 		clockMono: func() float64 { return time.Since(start).Seconds() },
 		httpCli:   &http.Client{Timeout: 6 * time.Second},
 		mqttCli:   mqtt.New("", 1883, ""),
+		tlStore:   timelapse.NewStore(dataDir),
 		printers:  map[string]*printerState{},
 	}
 	s.loadHistory()
@@ -212,6 +219,7 @@ func (s *Service) Configure(cfg config.RuntimeConfig) {
 	for id, ps := range s.printers {
 		pc := cfg.EffectivePrinter(id)
 		ps.tracker = tracker.New(trackerParamsFromConfig(pc))
+		ps.tlTracker = tracker.New(timelapseTrackerParamsFromConfig(pc))
 	}
 }
 
@@ -354,7 +362,8 @@ func (s *Service) upsertDeviceLocked(dev deviceapi.Device) *printerState {
 	if !ok {
 		pc := s.cfg.EffectivePrinter(dev.ID)
 		ps = &printerState{
-			tracker: tracker.New(trackerParamsFromConfig(pc)),
+			tracker:   tracker.New(trackerParamsFromConfig(pc)),
+			tlTracker: tracker.New(timelapseTrackerParamsFromConfig(pc)),
 		}
 		s.printers[dev.ID] = ps
 	}
@@ -397,7 +406,16 @@ func (s *Service) tickPrinter(ctx context.Context, id string, pc config.PrinterC
 		ps.alertActive = false
 		f := false
 		ps.lastMQTTPrinting = &f
+		endingTL := ps.activeTL
+		ps.activeTL = nil
+		ps.tlLastCaptureMono = 0
+		if ps.tlTracker != nil {
+			ps.tlTracker.Reset()
+		}
 		s.mu.Unlock()
+		if endingTL != nil {
+			_ = s.tlStore.Finish(id, endingTL.ID, timelapse.StatusStopped, s.now(), pc.TimelapseMaxSessions)
+		}
 		if wasPrinting || hadAlert {
 			_ = s.mqttCli.Publish(id+"/printing", []byte("OFF"), true)
 			_ = s.mqttCli.Publish(id+"/alert", []byte("OFF"), true)
@@ -419,30 +437,80 @@ func (s *Service) tickPrinter(ctx context.Context, id string, pc config.PrinterC
 			ps.consecutiveWarnings = 0
 			ps.pausedForJob = false
 		}
+		var endingTL *timelapse.Session
+		var shotForFinish SnapshotEvent
+		if !isPaused && ps.activeTL != nil {
+			endingTL = ps.activeTL
+			shotForFinish = ps.lastShot
+			ps.activeTL = nil
+			ps.tlLastCaptureMono = 0
+			if ps.tlTracker != nil {
+				ps.tlTracker.Reset()
+			}
+		}
 		s.mu.Unlock()
+		if endingTL != nil {
+			finalStatus := timelapse.StatusStopped
+			if tele.State == "FINISHED" || (tele.JobProgress != nil && *tele.JobProgress >= 99.0) {
+				finalStatus = timelapse.StatusCompleted
+				s.captureTimelapseFrame(ctx, id, endingTL.ID, pc, shotForFinish)
+			}
+			_ = s.tlStore.Finish(id, endingTL.ID, finalStatus, s.now(), pc.TimelapseMaxSessions)
+		}
 		if publishPrinting {
 			_ = s.mqttCli.Publish(id+"/printing", boolPayload(isPrinting), true)
 		}
 		return
 	}
 
-	if !pc.Enabled || ps.pausedForJob {
-		s.mu.Unlock()
-		if publishPrinting {
-			_ = s.mqttCli.Publish(id+"/printing", []byte("ON"), true)
+	nowMono := s.clockMono()
+
+	var tlCaptureSessionID string
+	var tlShot SnapshotEvent
+	if s.dataDir != "" && pc.TimelapseMode != "" && pc.TimelapseMode != config.TimelapseOff {
+		if ps.activeTL == nil {
+			started, err := s.tlStore.Start(id, tele.PrinterName, tele.JobPath, pc.TimelapseMode, pc.TimelapseFPS, s.now())
+			if err != nil {
+				s.log.WarnContext(ctx, "timelapse start failed", "printer", id, "error", err)
+			} else {
+				ps.activeTL = started
+				tlCaptureSessionID = started.ID
+				ps.tlLastCaptureMono = nowMono
+			}
 		}
-		return
+		if ps.activeTL != nil {
+			switch pc.TimelapseMode {
+			case config.TimelapseLayer:
+				if ps.tlTracker != nil && ps.tlTracker.UpdateZ(nowMono, tele.Z) != nil {
+					tlCaptureSessionID = ps.activeTL.ID
+					ps.tlLastCaptureMono = nowMono
+				}
+			case config.TimelapseInterval:
+				if tlCaptureSessionID == "" && nowMono-ps.tlLastCaptureMono >= pc.TimelapseIntervalSec {
+					tlCaptureSessionID = ps.activeTL.ID
+					ps.tlLastCaptureMono = nowMono
+				}
+			}
+		}
+		if tlCaptureSessionID != "" {
+			tlShot = ps.lastShot
+		}
 	}
 
-	nowMono := s.clockMono()
-	trig := ps.tracker.UpdateZ(nowMono, tele.Z)
-	if trig == nil {
-		trig = ps.tracker.CheckTimerFallback(nowMono)
+	var trig *tracker.Trigger
+	if pc.Enabled && !ps.pausedForJob {
+		trig = ps.tracker.UpdateZ(nowMono, tele.Z)
+		if trig == nil {
+			trig = ps.tracker.CheckTimerFallback(nowMono)
+		}
 	}
 	s.mu.Unlock()
 
 	if publishPrinting {
 		_ = s.mqttCli.Publish(id+"/printing", []byte("ON"), true)
+	}
+	if tlCaptureSessionID != "" {
+		s.captureTimelapseFrame(ctx, id, tlCaptureSessionID, pc, tlShot)
 	}
 	if trig != nil {
 		if _, err := s.runInspection(ctx, id, cfg, pc, *trig, true, false); err != nil {
@@ -660,6 +728,55 @@ func (s *Service) StoredFrame(printerID, frameID string) ([]byte, error) {
 	}
 	path := filepath.Join(s.dataDir, "frames", printerID, frameID+".jpg")
 	return os.ReadFile(path)
+}
+
+// ListTimelapses returns saved and active timelapse sessions sorted newest first.
+func (s *Service) ListTimelapses(printerFilter string) []timelapse.Session {
+	return s.tlStore.List(strings.TrimSpace(printerFilter))
+}
+
+// TimelapseFrame reads one JPEG frame from a timelapse session.
+func (s *Service) TimelapseFrame(printerID, sessionID, frameName string) ([]byte, error) {
+	return s.tlStore.ReadFrame(printerID, sessionID, frameName)
+}
+
+// DeleteTimelapse deletes a timelapse session folder from disk (clearing active pointer if needed).
+func (s *Service) DeleteTimelapse(printerID, sessionID string) error {
+	if err := s.tlStore.Delete(printerID, sessionID); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if ps, ok := s.printers[printerID]; ok && ps.activeTL != nil && ps.activeTL.ID == sessionID {
+		ps.activeTL = nil
+		ps.tlLastCaptureMono = 0
+		if ps.tlTracker != nil {
+			ps.tlTracker.Reset()
+		}
+	}
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *Service) captureTimelapseFrame(ctx context.Context, printerID, sessionID string, pc config.PrinterConfig, shot SnapshotEvent) {
+	jpg, _, _, err := s.fetchBestFrame(ctx, pc, shot)
+	if err != nil {
+		s.log.DebugContext(ctx, "timelapse frame fetch skipped", "printer", printerID, "session", sessionID, "error", err)
+		return
+	}
+	// Keep frames under Prusa Connect Local's 1 MiB routesapi.MaxModuleBody ceiling.
+	if len(jpg) > maxTimelapseFrameBytes {
+		if shrunk, prepErr := vision.ResizeJPEG(jpg, 1600, 85); prepErr == nil && len(shrunk) > 0 {
+			jpg = shrunk
+		}
+		if len(jpg) > maxTimelapseFrameBytes {
+			if shrunk, prepErr := vision.ResizeJPEG(jpg, 1280, 78); prepErr == nil && len(shrunk) > 0 {
+				jpg = shrunk
+			}
+		}
+	}
+	if _, err := s.tlStore.AddFrame(printerID, sessionID, jpg); err != nil {
+		s.log.WarnContext(ctx, "timelapse frame write failed", "printer", printerID, "session", sessionID, "error", err)
+	}
 }
 
 // Status returns the complete redacted fleet + history snapshot for GET /status.
@@ -1142,6 +1259,18 @@ func trackerParamsFromConfig(pc config.PrinterConfig) tracker.Params {
 		ZSettleSeconds:    pc.ZSettleSeconds,
 		MinCheckIntervalS: pc.MinCheckIntervalSec,
 		FallbackMaxWaitS:  pc.FallbackMaxWaitSec,
+		RebaselineDropMM:  1.0,
+	}
+}
+
+func timelapseTrackerParamsFromConfig(pc config.PrinterConfig) tracker.Params {
+	return tracker.Params{
+		WarmupSeconds:     pc.WarmupSeconds,
+		ZMinStepMM:        pc.ZMinStepMM,
+		ZMaxStepMM:        pc.ZMaxStepMM,
+		ZSettleSeconds:    pc.ZSettleSeconds,
+		MinCheckIntervalS: 2.0,
+		FallbackMaxWaitS:  0,
 		RebaselineDropMM:  1.0,
 	}
 }

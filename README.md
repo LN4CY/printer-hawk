@@ -140,6 +140,33 @@ In **Printer Settings**, choose **Default Settings for New Printers** or select 
 
 ---
 
+### 4. Whole-Print Timelapses (No Buddy3D Onboard Timelapse Needed)
+
+Printer Hawk records complete print timelapses directly on the Prusa Connect Local host (`<data_dir>/timelapses/`) using your configured **Live JPEG URL** (`go2rtc`) or **Prusa Connect Snapshots**, independent of whether AI failure monitoring is enabled:
+
+1. Enable **Whole-Print Timelapse Recording** under **Printer Settings**:
+   - **Per Layer (Automatic Z):** Captures the initial frame when printing starts, one settled frame on each layer advance, and a final completion frame when the print reaches `FINISHED`.
+   - **Fixed Interval:** Captures a frame every `Capture Interval (seconds)` (minimum `5s`) throughout the print.
+   - **Default Playback / Export FPS:** Default frame rate (`1-60`, default `24`) and **Max Saved Timelapses per Printer** retention limit (default `20`).
+2. Watch & export in the **Timelapses** tab:
+   - Play/Pause, step Prev/Next frame, scrub any frame with the slider, switch FPS (`10 / 15 / 24 / 30 / 60 fps`), delete old sessions, or click **Export Video** to render and download an `.mp4` / `.webm` video directly in your browser.
+3. **Important if migrating from Buddy3D UDP / G-code timelapse scripts (`M334` / `BUDDY_TIMELAPSE_*`):**
+   - **Remove** the `M334` / `M331 gcode` / `M118 BUDDY_TIMELAPSE_*` blocks from your PrusaSlicer Start, Layer, and End G-code and disable Buddy3D's onboard `Per Layer` timelapse. Running onboard Buddy3D timelapse alongside RTSP causes extra camera RAM load and freezes snapshots.
+   - Because Printer Hawk tracks layer Z transitions natively, **no custom G-code is required**.
+   - *(Optional)* If you want head-free parked-head timelapses with Printer Hawk, keep only the pure motion commands (no `M334`/`M331`/`M118`) in **After layer change G-code** with a `5s` dwell (`G4 P5000` > Printer Hawk's `4s` **Z Settle Time**):
+
+```gcode
+; Optional parked-head timelapse capture (motion only, no Buddy3D M118 markers)
+G10
+G1 X0 Y210 F9000
+M400
+G4 P5000
+G1 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} F9000
+G11
+```
+
+---
+
 ## Camera Setup via `go2rtc`
 
 ### Why use `go2rtc`?

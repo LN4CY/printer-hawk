@@ -31,6 +31,13 @@ const (
 	ActionPause  = "pause"
 )
 
+// Timelapse recording mode constants.
+const (
+	TimelapseOff      = "off"
+	TimelapseLayer    = "layer"
+	TimelapseInterval = "interval"
+)
+
 // SecretMask is returned by GET /settings when an API key is stored so secrets never leave the server.
 const SecretMask = "********"
 
@@ -127,6 +134,10 @@ type PrinterConfig struct {
 	Stage1WarnEscalateCount int     `json:"stage1_warn_escalate_count"`
 	Stage2PauseThreshold    float64 `json:"stage2_pause_threshold"`
 	CustomPromptNotes       string  `json:"custom_prompt_notes"`
+	TimelapseMode           string  `json:"timelapse_mode"`
+	TimelapseIntervalSec    float64 `json:"timelapse_interval_sec"`
+	TimelapseFPS            int     `json:"timelapse_fps"`
+	TimelapseMaxSessions    int     `json:"timelapse_max_sessions"`
 }
 
 // MQTTConfig stores optional smart-home MQTT notification settings.
@@ -186,6 +197,10 @@ func DefaultPrinterConfig() PrinterConfig {
 		Stage1WarnEscalateCount: 2,
 		Stage2PauseThreshold:    0.75,
 		CustomPromptNotes:       "",
+		TimelapseMode:           TimelapseOff,
+		TimelapseIntervalSec:    30.0,
+		TimelapseFPS:            24,
+		TimelapseMaxSessions:    20,
 	}
 }
 
@@ -346,6 +361,45 @@ func NormalizePrinter(pc PrinterConfig, fallback PrinterConfig) PrinterConfig {
 		pc.Stage2PauseThreshold = fallback.Stage2PauseThreshold
 	}
 	pc.CustomPromptNotes = strings.TrimSpace(pc.CustomPromptNotes)
+	switch strings.ToLower(strings.TrimSpace(pc.TimelapseMode)) {
+	case TimelapseLayer:
+		pc.TimelapseMode = TimelapseLayer
+	case TimelapseInterval:
+		pc.TimelapseMode = TimelapseInterval
+	case TimelapseOff:
+		pc.TimelapseMode = TimelapseOff
+	default:
+		if fallback.TimelapseMode == TimelapseLayer || fallback.TimelapseMode == TimelapseInterval {
+			pc.TimelapseMode = fallback.TimelapseMode
+		} else {
+			pc.TimelapseMode = TimelapseOff
+		}
+	}
+	if pc.TimelapseIntervalSec < 5 {
+		if fallback.TimelapseIntervalSec >= 5 {
+			pc.TimelapseIntervalSec = fallback.TimelapseIntervalSec
+		} else {
+			pc.TimelapseIntervalSec = 30.0
+		}
+	}
+	if pc.TimelapseFPS <= 0 {
+		pc.TimelapseFPS = fallback.TimelapseFPS
+	}
+	if pc.TimelapseFPS <= 0 {
+		pc.TimelapseFPS = 24
+	}
+	if pc.TimelapseFPS > 60 {
+		pc.TimelapseFPS = 60
+	}
+	if pc.TimelapseMaxSessions <= 0 {
+		pc.TimelapseMaxSessions = fallback.TimelapseMaxSessions
+	}
+	if pc.TimelapseMaxSessions <= 0 {
+		pc.TimelapseMaxSessions = 20
+	}
+	if pc.TimelapseMaxSessions > 200 {
+		pc.TimelapseMaxSessions = 200
+	}
 	return pc
 }
 

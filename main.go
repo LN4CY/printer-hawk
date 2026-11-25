@@ -360,6 +360,53 @@ func buildRoutes(svc *hawk.Service, access AccessChecker) http.Handler {
 		answerJSON(w, http.StatusOK, map[string]any{"ok": true, "printer": printerID, "detail": "Stop command sent"})
 	})
 
+	mux.HandleFunc("GET /timelapses", func(w http.ResponseWriter, r *http.Request) {
+		if svc == nil {
+			answerJSON(w, http.StatusOK, map[string]any{"sessions": []any{}})
+			return
+		}
+		printerFilter := strings.TrimSpace(r.URL.Query().Get("printer"))
+		answerJSON(w, http.StatusOK, map[string]any{"sessions": svc.ListTimelapses(printerFilter)})
+	})
+
+	mux.HandleFunc("GET /timelapses/{printer}/{session}/frames/{frame}", func(w http.ResponseWriter, r *http.Request) {
+		if svc == nil {
+			refuse(w, r, FrameNotFound.New("service not initialized"))
+			return
+		}
+		printerID := r.PathValue("printer")
+		sessionID := r.PathValue("session")
+		frameName := r.PathValue("frame")
+		jpg, err := svc.TimelapseFrame(printerID, sessionID, frameName)
+		if err != nil {
+			refuse(w, r, FrameNotFound.New("timelapse frame not found").With(fault.StringParam("printer", printerID)))
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(jpg)
+	})
+
+	mux.HandleFunc("DELETE /timelapses/{printer}/{session}", func(w http.ResponseWriter, r *http.Request) {
+		if svc == nil {
+			refuse(w, r, CommandRejected.New("service not initialized").With(fault.StringParam("reason", "not configured")))
+			return
+		}
+		printerID := r.PathValue("printer")
+		sessionID := r.PathValue("session")
+		if !checkDeviceOperate(r.Context(), access, routesapi.PrincipalOf(r), printerID) {
+			refuse(w, r, PermissionDenied.New("caller lacks operate permission on printer").
+				With(fault.StringParam("resource", printerID)))
+			return
+		}
+		if err := svc.DeleteTimelapse(printerID, sessionID); err != nil {
+			refuse(w, r, FrameNotFound.New("timelapse session not found").With(fault.StringParam("printer", printerID)))
+			return
+		}
+		answerJSON(w, http.StatusOK, map[string]any{"ok": true, "printer": printerID, "detail": "Timelapse deleted"})
+	})
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		refuse(w, r, RouteNotFound.
 			New("this module serves no route at "+r.URL.Path).

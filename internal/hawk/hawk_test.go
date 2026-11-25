@@ -281,3 +281,78 @@ func TestStartInspectAsync(t *testing.T) {
 	}
 	t.Fatal("timed out waiting for async StartInspect completion")
 }
+
+func TestWholePrintTimelapseLifecycle(t *testing.T) {
+	imgBytes := testJPEG(90, 140, 210)
+	camSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write(imgBytes)
+	}))
+	defer camSrv.Close()
+
+	devs := &fakeDevices{dev: deviceapi.Device{
+		ID:        "p1",
+		Name:      "CORE One",
+		Connected: true,
+		State: map[string]json.RawMessage{
+			"/state":    json.RawMessage(`"PRINTING"`),
+			"/axis/z":   json.RawMessage(`0.20`),
+			"/job/path": json.RawMessage(`"/usb/benchy.bgcode"`),
+		},
+	}}
+	svc := New(devs, &fakeStorage{}, nil, nil, t.TempDir(), nil)
+	svc.now = func() time.Time { return time.Date(2026, 11, 25, 19, 0, 0, 0, time.UTC) }
+	mono := 0.0
+	svc.clockMono = func() float64 { return mono }
+
+	cfg := config.FromManifest(config.DefaultManifestSettings())
+	cfg.DefaultPrinter.Enabled = false // Timelapse must work even when AI guard is disabled
+	cfg.DefaultPrinter.CameraMode = config.CameraModeURL
+	cfg.DefaultPrinter.LiveFrameURL = camSrv.URL
+	cfg.DefaultPrinter.WarmupSeconds = 5
+	cfg.DefaultPrinter.ZSettleSeconds = 1
+	cfg.DefaultPrinter.TimelapseMode = config.TimelapseLayer
+	cfg.DefaultPrinter.TimelapseFPS = 24
+	svc.Configure(cfg)
+
+	// Tick 1: starts session + captures initial frame (frame 1)
+	svc.Tick(context.Background())
+	// Warmup + settle Layer 1 baseline (frame 2)
+	mono = 6
+	svc.Tick(context.Background())
+	mono = 8
+	svc.Tick(context.Background())
+
+	// Layer 2 at Z=0.40 settles (frame 3)
+	devs.dev.State["/axis/z"] = json.RawMessage(`0.40`)
+	mono = 11
+	svc.Tick(context.Background())
+	mono = 13
+	svc.Tick(context.Background())
+
+	sessions := svc.ListTimelapses("p1")
+	if len(sessions) != 1 || sessions[0].Status != "recording" || sessions[0].FrameCount != 3 {
+		t.Fatalf("expected active session with 3 frames, got %+v", sessions)
+	}
+
+	// Print finishes -> captures final frame (frame 4) and marks completed
+	devs.dev.State["/state"] = json.RawMessage(`"FINISHED"`)
+	devs.dev.State["/job/progress"] = json.RawMessage(`100.0`)
+	mono = 15
+	svc.Tick(context.Background())
+
+	sessions = svc.ListTimelapses("p1")
+	if len(sessions) != 1 || sessions[0].Status != "completed" || sessions[0].FrameCount != 4 || sessions[0].JobName != "benchy" {
+		t.Fatalf("expected completed benchy session with 4 frames, got %+v", sessions)
+	}
+	raw, err := svc.TimelapseFrame("p1", sessions[0].ID, "000004.jpg")
+	if err != nil || len(raw) == 0 {
+		t.Fatalf("TimelapseFrame failed: %v", err)
+	}
+	if err := svc.DeleteTimelapse("p1", sessions[0].ID); err != nil {
+		t.Fatalf("DeleteTimelapse failed: %v", err)
+	}
+	if got := svc.ListTimelapses("p1"); len(got) != 0 {
+		t.Fatalf("expected empty list after delete, got %+v", got)
+	}
+}

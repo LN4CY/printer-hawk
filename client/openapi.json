@@ -80,6 +80,18 @@
           },
           "custom_prompt_notes": {
             "type": "string"
+          },
+          "timelapse_mode": {
+            "type": "string"
+          },
+          "timelapse_interval_sec": {
+            "type": "number"
+          },
+          "timelapse_fps": {
+            "type": "integer"
+          },
+          "timelapse_max_sessions": {
+            "type": "integer"
           }
         },
         "required": [
@@ -96,7 +108,11 @@
           "stage1_fail_threshold",
           "stage1_warn_escalate_count",
           "stage2_pause_threshold",
-          "custom_prompt_notes"
+          "custom_prompt_notes",
+          "timelapse_mode",
+          "timelapse_interval_sec",
+          "timelapse_fps",
+          "timelapse_max_sessions"
         ]
       },
       "MQTTConfig": {
@@ -494,6 +510,73 @@
           "ok",
           "printer"
         ]
+      },
+      "TimelapseSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "printer_id": {
+            "type": "string"
+          },
+          "printer_name": {
+            "type": "string"
+          },
+          "job_name": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "ended_at": {
+            "type": "string"
+          },
+          "fps": {
+            "type": "integer"
+          },
+          "frame_count": {
+            "type": "integer"
+          },
+          "bytes_total": {
+            "type": "integer"
+          },
+          "thumbnail_frame": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "printer_id",
+          "printer_name",
+          "job_name",
+          "mode",
+          "status",
+          "started_at",
+          "fps",
+          "frame_count",
+          "bytes_total"
+        ]
+      },
+      "TimelapseListPayload": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelapseSession"
+            }
+          }
+        },
+        "required": [
+          "sessions"
+        ]
       }
     }
   },
@@ -822,6 +905,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StatusPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses": {
+      "get": {
+        "operationId": "list-timelapses",
+        "summary": "List recorded whole-print timelapse sessions",
+        "description": "Returns active and completed timelapse sessions across all printers or filtered by printer ID.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timelapse session list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelapseListPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}": {
+      "delete": {
+        "operationId": "delete-timelapse",
+        "summary": "Delete a recorded timelapse session",
+        "description": "Deletes a timelapse session directory and all its captured JPEG frames for the specified printer.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timelapse session deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}/frames/{frame}": {
+      "get": {
+        "operationId": "get-timelapse-frame",
+        "summary": "Retrieve one JPEG frame from a timelapse session",
+        "description": "Returns the sequential JPEG frame image belonging to the specified printer and timelapse session.",
+        "parameters": [
+          {
+            "name": "printer",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "frame",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timelapse JPEG frame.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }

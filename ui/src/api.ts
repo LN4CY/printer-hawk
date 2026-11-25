@@ -10,6 +10,9 @@ export type ProviderSlot = components['schemas']['ProviderSlot'];
 export type StageResult = components['schemas']['StageResult'];
 export type ProviderTestResult = components['schemas']['ProviderTestResult'];
 export type ActionResult = components['schemas']['ActionResult'];
+export type TimelapseSession = components['schemas']['TimelapseSession'];
+export type TimelapseListPayload =
+  components['schemas']['TimelapseListPayload'];
 
 export const hawkOn = (host: ModuleHost) => {
   const routes = bind(host.client);
@@ -20,6 +23,14 @@ export const hawkOn = (host: ModuleHost) => {
     const res = await call;
     if (!res.ok) return undefined;
     return URL.createObjectURL(await res.blob());
+  };
+
+  const fetchImageBlob = async (
+    call: Promise<Response>,
+  ): Promise<Blob | undefined> => {
+    const res = await call;
+    if (!res.ok) return undefined;
+    return res.blob();
   };
 
   return {
@@ -79,5 +90,38 @@ export const hawkOn = (host: ModuleHost) => {
       fetchImageUrl(
         routes.getStoredFrame({ path: { printer, frameId } }, signal),
       ),
+
+    listTimelapses: (
+      printer?: string,
+      signal?: AbortSignal,
+    ): Promise<TimelapseListPayload> =>
+      routes.listTimelapses(printer ? { query: { printer } } : {}, signal),
+
+    timelapseFrameUrl: (
+      printer: string,
+      session: string,
+      frame: string,
+      signal?: AbortSignal,
+    ) =>
+      fetchImageUrl(
+        routes.getTimelapseFrame({ path: { printer, session, frame } }, signal),
+      ),
+
+    timelapseFrameBlob: (
+      printer: string,
+      session: string,
+      frame: string,
+      signal?: AbortSignal,
+    ) =>
+      fetchImageBlob(
+        routes.getTimelapseFrame({ path: { printer, session, frame } }, signal),
+      ),
+
+    deleteTimelapse: (
+      printer: string,
+      session: string,
+      signal?: AbortSignal,
+    ): Promise<ActionResult> =>
+      routes.deleteTimelapse({ path: { printer, session } }, signal),
   };
 };

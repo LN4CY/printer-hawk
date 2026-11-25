@@ -35,6 +35,7 @@
   } from './api';
   import { heldHost } from './host';
   import PrinterView from './printer-view.svelte';
+  import TimelapsesView from './timelapses-view.svelte';
 
   const host = heldHost();
   const t = host.t;
@@ -141,6 +142,12 @@
     { value: 'url', label: t('printerHawk.settings.camUrl') },
   ]);
 
+  const timelapseModeItems = $derived([
+    { value: 'off', label: t('printerHawk.settings.tlOff') },
+    { value: 'layer', label: t('printerHawk.settings.tlLayer') },
+    { value: 'interval', label: t('printerHawk.settings.tlInterval') },
+  ]);
+
   const targetPrinterItems = $derived([
     { value: '__default__', label: t('printerHawk.settings.useDefault') },
     ...(status?.printers ?? []).map((p) => ({
@@ -172,6 +179,9 @@
   <Tabs bind:value={activeTab}>
     <TabsList>
       <TabsTrigger value="monitor">{t('printerHawk.tabs.monitor')}</TabsTrigger>
+      <TabsTrigger value="timelapses">
+        {t('printerHawk.tabs.timelapses')}
+      </TabsTrigger>
       <TabsTrigger value="providers">
         {t('printerHawk.tabs.providers')}
       </TabsTrigger>
@@ -214,6 +224,10 @@
           />
         {/if}
       {/if}
+    </TabsContent>
+
+    <TabsContent value="timelapses" class="mt-4 flex flex-col gap-4">
+      <TimelapsesView />
     </TabsContent>
 
     <TabsContent value="providers" class="mt-4 flex flex-col gap-4">
@@ -655,6 +669,92 @@
                 disabled={!settings.page_setup}
                 bind:value={editedPrinterConfig.custom_prompt_notes}
               />
+            </div>
+
+            <div class="border-t border-border pt-3">
+              <div class="mb-2 text-xs font-medium text-foreground">
+                {t('printerHawk.settings.timelapseSection')}
+              </div>
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <div class="flex flex-col gap-1">
+                  <Label variant="hint">
+                    {t('printerHawk.settings.timelapseMode')}
+                  </Label>
+                  <Select
+                    items={timelapseModeItems}
+                    disabled={!settings.page_setup}
+                    bind:value={editedPrinterConfig.timelapse_mode}
+                  >
+                    <SelectTrigger size="sm" class="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {#each timelapseModeItems as opt (opt.value)}
+                        <SelectItem value={opt.value}>{opt.label}</SelectItem>
+                      {/each}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {#if editedPrinterConfig.timelapse_mode === 'interval'}
+                  <div class="flex flex-col gap-1">
+                    <Label variant="hint">
+                      {t('printerHawk.settings.timelapseInterval')}
+                    </Label>
+                    <Input
+                      type="number"
+                      min="5"
+                      step="1"
+                      size="sm"
+                      disabled={!settings.page_setup}
+                      value={String(editedPrinterConfig.timelapse_interval_sec)}
+                      oninput={(e: Event) => {
+                        editedPrinterConfig.timelapse_interval_sec = Number(
+                          inputValue(e),
+                        );
+                      }}
+                    />
+                  </div>
+                {/if}
+
+                <div class="flex flex-col gap-1">
+                  <Label variant="hint">
+                    {t('printerHawk.settings.timelapseFps')}
+                  </Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="60"
+                    step="1"
+                    size="sm"
+                    disabled={!settings.page_setup}
+                    value={String(editedPrinterConfig.timelapse_fps)}
+                    oninput={(e: Event) => {
+                      editedPrinterConfig.timelapse_fps = Number(inputValue(e));
+                    }}
+                  />
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <Label variant="hint">
+                    {t('printerHawk.settings.timelapseMax')}
+                  </Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="200"
+                    step="1"
+                    size="sm"
+                    disabled={!settings.page_setup}
+                    value={String(editedPrinterConfig.timelapse_max_sessions)}
+                    oninput={(e: Event) => {
+                      editedPrinterConfig.timelapse_max_sessions = Number(
+                        inputValue(e),
+                      );
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

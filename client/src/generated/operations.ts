@@ -7,11 +7,14 @@ import type { operations } from "./module-api.js";
 /** Every operation the document declares, keyed by its operationId. */
 export const operationTable = {
   "clear-alert": { id: "clear-alert", method: "POST", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/clear", response: "json", anonymous: false },
+  "delete-timelapse": { id: "delete-timelapse", method: "DELETE", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}", response: "json", anonymous: false },
   "get-live-frame": { id: "get-live-frame", method: "GET", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/live.jpg", response: "raw", anonymous: false },
   "get-settings": { id: "get-settings", method: "GET", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/settings", response: "json", anonymous: false },
   "get-status": { id: "get-status", method: "GET", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/status", response: "json", anonymous: false },
   "get-stored-frame": { id: "get-stored-frame", method: "GET", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/frames/{frameId}.jpg", response: "raw", anonymous: false },
+  "get-timelapse-frame": { id: "get-timelapse-frame", method: "GET", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}/frames/{frame}", response: "raw", anonymous: false },
   "inspect-printer": { id: "inspect-printer", method: "POST", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/inspect", response: "json", anonymous: false },
+  "list-timelapses": { id: "list-timelapses", method: "GET", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses", response: "json", anonymous: false },
   "mark-false-alarm": { id: "mark-false-alarm", method: "POST", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/false-alarm", response: "json", anonymous: false },
   "pause-printer": { id: "pause-printer", method: "POST", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/pause", response: "json", anonymous: false },
   "stop-printer": { id: "stop-printer", method: "POST", path: "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/stop", response: "json", anonymous: false },
@@ -32,6 +35,18 @@ export interface Operations {
     },
     signal?: AbortSignal,
   ): Promise<operations["clear-alert"]["responses"][200]["content"]["application/json"]>;
+
+  /**
+   * DELETE /api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}
+   *
+   * Delete a recorded timelapse session
+   */
+  deleteTimelapse(
+    request: {
+      path: operations["delete-timelapse"]["parameters"]["path"];
+    },
+    signal?: AbortSignal,
+  ): Promise<operations["delete-timelapse"]["responses"][200]["content"]["application/json"]>;
 
   /**
    * GET /api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/live.jpg
@@ -80,6 +95,18 @@ export interface Operations {
   ): Promise<Response>;
 
   /**
+   * GET /api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}/frames/{frame}
+   *
+   * Retrieve one JPEG frame from a timelapse session
+   */
+  getTimelapseFrame(
+    request: {
+      path: operations["get-timelapse-frame"]["parameters"]["path"];
+    },
+    signal?: AbortSignal,
+  ): Promise<Response>;
+
+  /**
    * POST /api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/inspect
    *
    * Run dry-run AI inspection on one printer
@@ -91,6 +118,18 @@ export interface Operations {
     },
     signal?: AbortSignal,
   ): Promise<operations["inspect-printer"]["responses"][200]["content"]["application/json"]>;
+
+  /**
+   * GET /api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses
+   *
+   * List recorded whole-print timelapse sessions
+   */
+  listTimelapses(
+    request?: {
+      query?: operations["list-timelapses"]["parameters"]["query"];
+    },
+    signal?: AbortSignal,
+  ): Promise<operations["list-timelapses"]["responses"][200]["content"]["application/json"]>;
 
   /**
    * POST /api/v1/modules/com.github.aux.ln4cy.printer-hawk/printers/{printer}/false-alarm
@@ -157,11 +196,14 @@ export interface Operations {
 export function bindOperations(transport: Transport): Operations {
   return {
     clearAlert: (request, signal) => transport.call(operationTable["clear-alert"], request, signal),
+    deleteTimelapse: (request, signal) => transport.call(operationTable["delete-timelapse"], request, signal),
     getLiveFrame: (request, signal) => transport.call(operationTable["get-live-frame"], request, signal),
     getSettings: (request = {}, signal) => transport.call(operationTable["get-settings"], request, signal),
     getStatus: (request = {}, signal) => transport.call(operationTable["get-status"], request, signal),
     getStoredFrame: (request, signal) => transport.call(operationTable["get-stored-frame"], request, signal),
+    getTimelapseFrame: (request, signal) => transport.call(operationTable["get-timelapse-frame"], request, signal),
     inspectPrinter: (request, signal) => transport.call(operationTable["inspect-printer"], request, signal),
+    listTimelapses: (request = {}, signal) => transport.call(operationTable["list-timelapses"], request, signal),
     markFalseAlarm: (request, signal) => transport.call(operationTable["mark-false-alarm"], request, signal),
     pausePrinter: (request, signal) => transport.call(operationTable["pause-printer"], request, signal),
     stopPrinter: (request, signal) => transport.call(operationTable["stop-printer"], request, signal),

@@ -208,6 +208,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List recorded whole-print timelapse sessions
+         * @description Returns active and completed timelapse sessions across all printers or filtered by printer ID.
+         */
+        get: operations["list-timelapses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a recorded timelapse session
+         * @description Deletes a timelapse session directory and all its captured JPEG frames for the specified printer.
+         */
+        delete: operations["delete-timelapse"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/modules/com.github.aux.ln4cy.printer-hawk/timelapses/{printer}/{session}/frames/{frame}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve one JPEG frame from a timelapse session
+         * @description Returns the sequential JPEG frame image belonging to the specified printer and timelapse session.
+         */
+        get: operations["get-timelapse-frame"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -236,6 +296,10 @@ export interface components {
             stage1_warn_escalate_count: number;
             stage2_pause_threshold: number;
             custom_prompt_notes: string;
+            timelapse_mode: string;
+            timelapse_interval_sec: number;
+            timelapse_fps: number;
+            timelapse_max_sessions: number;
         };
         MQTTConfig: {
             host: string;
@@ -343,6 +407,23 @@ export interface components {
             ok: boolean;
             printer: string;
             detail?: string;
+        };
+        TimelapseSession: {
+            id: string;
+            printer_id: string;
+            printer_name: string;
+            job_name: string;
+            mode: string;
+            status: string;
+            started_at: string;
+            ended_at?: string;
+            fps: number;
+            frame_count: number;
+            bytes_total: number;
+            thumbnail_frame?: string;
+        };
+        TimelapseListPayload: {
+            sessions: components["schemas"]["TimelapseSession"][];
         };
     };
     responses: never;
@@ -596,6 +677,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusPayload"];
+                };
+            };
+        };
+    };
+    "list-timelapses": {
+        parameters: {
+            query?: {
+                printer?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Timelapse session list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelapseListPayload"];
+                };
+            };
+        };
+    };
+    "delete-timelapse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printer: string;
+                session: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Timelapse session deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionResult"];
+                };
+            };
+        };
+    };
+    "get-timelapse-frame": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printer: string;
+                session: string;
+                frame: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Timelapse JPEG frame. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
                 };
             };
         };
