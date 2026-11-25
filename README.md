@@ -1,12 +1,15 @@
 # Printer Hawk — Dual-Stage VLM Print Failure Guard for Prusa Connect Local
 
-**Printer Hawk** is a native Prusa Connect Local extension (`com.github.aux.ln4cy.printer-hawk`) that monitors 3D prints with Vision-Language Models (VLMs) instead of single-frame spaghetti-only heuristics. It works with **any combination** of local GPU/CPU inference (**Ollama**, **LM Studio**, **vLLM**, **llama.cpp**) and cloud APIs (**Gemini**, **Anthropic Claude**, **OpenAI / OpenRouter**), with automatic Primary -> Fallback failover.
+**Printer Hawk** is a native Prusa Connect Local extension (`com.github.aux.ln4cy.printer-hawk`) that monitors 3D prints with Vision-Language Models (VLMs) and records whole-print timelapses directly from your printer camera relay. Instead of single-frame spaghetti-only heuristics, it works with **any combination** of local GPU/CPU inference (**Ollama**, **LM Studio**, **vLLM**, **llama.cpp**) and cloud APIs (**Gemini**, **Anthropic Claude**, **OpenAI / OpenRouter**), with automatic Primary -> Fallback failover.
 
 ## Key Features
 
 - **Dual-Stage AI Verification (with Failover):**
   - **Stage 1 (Fast Screener):** Runs on every settled layer change (or fallback timer) with previous + current frames and live printer telemetry (Z height, nozzle/bed temperatures, progress). Automatically fails over from **Stage 1 Primary -> Stage 1 Fallback** if the primary is unreachable or busy.
   - **Stage 2 (Confirmation Gate):** Triggered only when Stage 1 flags a failure or repeated warnings (`Warnings Before Stage 2`). Compares earlier bed baseline + previous clean + current frames to rule out supports, purge towers, glossy reflections, or shadows before pausing. Supports **Stage 2 Primary -> Stage 2 Fallback** or single-stage operation when Stage 2 is set to `Disabled (none)`.
+- **Whole-Print Timelapses & Browser Video Export:**
+  - Automatically records **Per Layer** (settled Z advance + print start/finish) or **Fixed Interval** timelapses from your configured `go2rtc` Live JPEG URL or Prusa Connect snapshots, independent of whether AI monitoring is enabled.
+  - Includes a built-in canvas player, frame scrubber slider, FPS selector (`10 / 15 / 24 / 30 / 60 fps`), retention pruning, and one-click client-side `.mp4` / `.webm` **Export Video** in the browser (zero server `ffmpeg` or Buddy3D onboard camera load).
 - **Per-Layer Z Tracking (Toolchanger & Z-Hop Safe):**
   - Ignores short Z-hops and large multi-tool travel lifts (`Z > ConfirmedZ + Max Z Step`).
   - Re-baselines cleanly downward if warmup finishes while parked high (for example `Z = 40 mm`) before Layer 1.
@@ -16,6 +19,7 @@
   - **Custom Live JPEG URL (`go2rtc` / HTTP):** Pulls live JPEGs directly from an HTTP snapshot endpoint (such as a single-connection `go2rtc` RTSP relay on `http://127.0.0.1:1984/api/frame.jpeg?src=coreone`), with automatic fallback to Prusa Connect snapshots on error.
 - **Native UI Controls & Stored Frame History:**
   - Available both as a fleet-wide **Printer Hawk** sidebar page and as an embedded **Printer Hawk** tab on every printer page.
+  - Asynchronous **Dry-Run Stage 1** and **Dry-Run Stage 1 + 2** checks run in the background without hitting Prusa Connect Local's 10s route timeout.
   - **Live Camera / Last AI Frame** toggle with configurable refresh rate (`1s`, `2s`, `5s`, `Custom`, `Paused`).
   - **False Alarm (Accept Bed)** promotes the current bed frame as the new clean baseline and clears the pause latch.
   - Rolling historical frames stored on disk so you can click **Inspect Frame** on any past check.
@@ -71,8 +75,8 @@ docker compose restart prusa-connect
 The **Monitor** tab (and the **Printer Hawk** tab inside each individual printer page) gives live operational control and check history:
 
 - **Top Action Buttons:**
-  - **Dry-Run Stage 1:** Captures the current camera frame right now and runs Stage 1 only (never pauses or latches an alert).
-  - **Dry-Run Stage 1 + 2:** Forces both Stage 1 and Stage 2 verification on the current frame so you can test the confirmation pipeline without affecting an active print.
+  - **Dry-Run Stage 1:** Queues an asynchronous snapshot + Stage 1 inspection on the current camera frame (never pauses or latches an alert) and refreshes results automatically when finished.
+  - **Dry-Run Stage 1 + 2:** Queues both Stage 1 and Stage 2 verification on the current frame so you can test the confirmation pipeline asynchronously without hitting route timeouts or affecting an active print.
   - **False Alarm (Accept Bed):** Clears an active alert/latch and promotes the latest analyzed frame as the clean reference baseline for subsequent Stage 2 comparisons.
   - **Clear Alert:** Resets `FAILURE ALERT ACTIVE`, consecutive warning count, and per-job pause latch without changing the reference frame.
   - **Pause Print:** Manually sends `core.command.pause_print` to the connected printer (requires caller `operate` permission).
@@ -80,11 +84,40 @@ The **Monitor** tab (and the **Printer Hawk** tab inside each individual printer
 - **Camera Viewer:**
   - Switch between **Live Camera** (polls `/live.jpg` from your configured source) and **Last AI Frame** (shows the exact stored frame from the most recent check).
   - Use the refresh dropdown (`1s`, `2s`, `5s`, `Custom`, `Paused`) to tune live preview polling. Selecting **Custom** reveals a seconds box (minimum `0.5s`, default `10s`).
-- **Recent Checks Table:** Shows timestamp, trigger (`layer_baseline`, `layer_advance`, `layer_rebaseline`, `timer_fallback`, `dry_run`), image source, Stage 1 & Stage 2 verdicts/models (including failover badges when fallback ran), action taken, and an **Inspect Frame** button to open the archived JPEG alongside the AI's reasoning.
+- **Recent Checks Table:** Shows timestamp, trigger (`layer_baseline`, `layer_advance`, `layer_rebaseline`, `timer_fallback`, `manual_inspect`), image source, Stage 1 & Stage 2 verdicts/models (including failover badges when fallback ran), action taken, and an **Inspect Frame** button to open the archived JPEG alongside the AI's reasoning.
 
 ---
 
-### 2. AI Providers & Automatic Failover
+### 2. Whole-Print Timelapses (No Buddy3D Onboard Timelapse Needed)
+
+![Printer Hawk Timelapses tab](docs/images/timelapses.png)
+
+Printer Hawk records complete print timelapses directly on the Prusa Connect Local host (`<data_dir>/timelapses/`) using your configured **Live JPEG URL** (`go2rtc`) or **Prusa Connect Snapshots**, independent of whether AI failure monitoring is enabled:
+
+1. Enable **Whole-Print Timelapse Recording** under **Printer Settings** (see [Section 4](#4-printer-settings-timelapse-config-z-layer-tuning--mqtt)):
+   - **Per Layer (Automatic Z):** Captures the initial frame when printing starts, one settled frame on each layer advance, and a final completion frame when the print reaches `FINISHED`.
+   - **Fixed Interval:** Captures a frame every `Capture Interval (seconds)` (minimum `5s`) throughout the print.
+   - **Default Playback / Export FPS:** Default frame rate (`1-60`, default `24`) and **Max Saved Timelapses per Printer** retention limit (default `20`).
+2. Watch & export in the **Timelapses** tab:
+   - Play/Pause, step **Prev**/**Next** frame, scrub any frame with the slider, switch **Playback FPS** (`10 / 15 / 24 / 30 / 60 fps`), **Delete** old sessions, or click **Export Video** to render and download an `.mp4` / `.webm` video directly in your browser.
+3. **Important if migrating from Buddy3D UDP / G-code timelapse scripts (`M334` / `BUDDY_TIMELAPSE_*`):**
+   - **Remove** the `M334` / `M331 gcode` / `M118 BUDDY_TIMELAPSE_*` blocks from your PrusaSlicer Start, Layer, and End G-code and disable Buddy3D's onboard `Per Layer` timelapse. Running onboard Buddy3D timelapse alongside RTSP causes extra camera RAM load and freezes snapshots.
+   - Because Printer Hawk tracks layer Z transitions natively, **no custom G-code is required**.
+   - *(Optional)* If you want head-free parked-head timelapses with Printer Hawk, keep only the pure motion commands (no `M334`/`M331`/`M118`) in **After layer change G-code** with a `5s` dwell (`G4 P5000` > Printer Hawk's `4s` **Z Settle Time**):
+
+```gcode
+; Optional parked-head timelapse capture (motion only, no Buddy3D M118 markers)
+G10
+G1 X0 Y210 F9000
+M400
+G4 P5000
+G1 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} F9000
+G11
+```
+
+---
+
+### 3. AI Providers & Automatic Failover
 
 ![Printer Hawk AI Providers tab](docs/images/ai-providers.png)
 
@@ -118,7 +151,7 @@ Saved API keys are stored only on the server (`<data_dir>/settings.json`, `0600`
 
 ---
 
-### 3. Printer Settings, Z-Layer Tuning & MQTT
+### 4. Printer Settings, Timelapse Config, Z-Layer Tuning & MQTT
 
 ![Printer Hawk Printer Settings tab](docs/images/printer-settings.png)
 
@@ -133,37 +166,11 @@ In **Printer Settings**, choose **Default Settings for New Printers** or select 
   - `Min Check Interval (15s)`: Minimum spacing between AI checks.
   - `Long-Layer Max Wait (60s)`: Fires a `timer_fallback` inspection when a single large layer takes longer than this duration.
 - **Decision Thresholds & Prompt Notes:** Adjust `Stage 1 Fail Confidence` (default `0.65`), `Stage 2 Pause Confidence` (default `0.75`), and add **Extra Vision Prompt Notes** for printer-specific quirks (e.g., purge towers, textured PEI sheet, dark enclosure lighting, multi-toolhead parking).
+- **Whole-Print Timelapse Recording:** Choose **Recording Mode** (`Off`, `Per Layer`, or `Fixed Interval` with `Capture Interval`), set **Default Playback / Export FPS** (`1-60`), and cap **Max Saved Timelapses per Printer** (see [Section 2](#2-whole-print-timelapses-no-buddy3d-onboard-timelapse-needed)).
 - **Optional Smart-Home MQTT Publisher:** Set **MQTT Broker Host** (e.g. `127.0.0.1`), **Port** (`1883`), and **Topic Prefix** (default `prusa/printer-hawk`). Leave **MQTT Broker Host** blank to disable MQTT. When enabled, Printer Hawk publishes retained topics per printer:
   - `<prefix>/<printer_id>/printing` -> `ON` / `OFF`
   - `<prefix>/<printer_id>/alert` -> `ON` / `OFF`
   - `<prefix>/<printer_id>/status` -> JSON payload with latest Z/layer, Stage 1/2 verdict, and action taken.
-
----
-
-### 4. Whole-Print Timelapses (No Buddy3D Onboard Timelapse Needed)
-
-Printer Hawk records complete print timelapses directly on the Prusa Connect Local host (`<data_dir>/timelapses/`) using your configured **Live JPEG URL** (`go2rtc`) or **Prusa Connect Snapshots**, independent of whether AI failure monitoring is enabled:
-
-1. Enable **Whole-Print Timelapse Recording** under **Printer Settings**:
-   - **Per Layer (Automatic Z):** Captures the initial frame when printing starts, one settled frame on each layer advance, and a final completion frame when the print reaches `FINISHED`.
-   - **Fixed Interval:** Captures a frame every `Capture Interval (seconds)` (minimum `5s`) throughout the print.
-   - **Default Playback / Export FPS:** Default frame rate (`1-60`, default `24`) and **Max Saved Timelapses per Printer** retention limit (default `20`).
-2. Watch & export in the **Timelapses** tab:
-   - Play/Pause, step Prev/Next frame, scrub any frame with the slider, switch FPS (`10 / 15 / 24 / 30 / 60 fps`), delete old sessions, or click **Export Video** to render and download an `.mp4` / `.webm` video directly in your browser.
-3. **Important if migrating from Buddy3D UDP / G-code timelapse scripts (`M334` / `BUDDY_TIMELAPSE_*`):**
-   - **Remove** the `M334` / `M331 gcode` / `M118 BUDDY_TIMELAPSE_*` blocks from your PrusaSlicer Start, Layer, and End G-code and disable Buddy3D's onboard `Per Layer` timelapse. Running onboard Buddy3D timelapse alongside RTSP causes extra camera RAM load and freezes snapshots.
-   - Because Printer Hawk tracks layer Z transitions natively, **no custom G-code is required**.
-   - *(Optional)* If you want head-free parked-head timelapses with Printer Hawk, keep only the pure motion commands (no `M334`/`M331`/`M118`) in **After layer change G-code** with a `5s` dwell (`G4 P5000` > Printer Hawk's `4s` **Z Settle Time**):
-
-```gcode
-; Optional parked-head timelapse capture (motion only, no Buddy3D M118 markers)
-G10
-G1 X0 Y210 F9000
-M400
-G4 P5000
-G1 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} F9000
-G11
-```
 
 ---
 
