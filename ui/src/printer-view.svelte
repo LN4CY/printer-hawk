@@ -359,7 +359,7 @@
         {#if camMode === 'live'}
           <div class="flex items-center gap-2">
             <Select items={rateItems} bind:value={refreshRate}>
-              <SelectTrigger size="sm" class="w-28">
+              <SelectTrigger size="sm" class="min-w-36 shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -370,17 +370,18 @@
             </Select>
             {#if refreshRate === 'custom'}
               <div class="flex items-center gap-1">
-                <Input
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  size="sm"
-                  class="w-20"
-                  value={customRateSec}
-                  oninput={(e: Event) => {
-                    customRateSec = inputValue(e);
-                  }}
-                />
+                <div class="w-20 shrink-0">
+                  <Input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    size="sm"
+                    value={customRateSec}
+                    oninput={(e: Event) => {
+                      customRateSec = inputValue(e);
+                    }}
+                  />
+                </div>
                 <span class="text-xs text-muted-foreground">
                   {t('printerHawk.rates.secUnit')}
                 </span>
