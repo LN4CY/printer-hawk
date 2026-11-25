@@ -9,7 +9,7 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/fault"
 )
 
-// faultDomain is derived from github.com/LN4CY/printer-hawk.
+// faultDomain is derived from github.com/ln4cy/printer-hawk.
 //
 //nolint:gochecknoglobals // built once at process startup.
 var faultDomain = mustDomain("com.github.aux.ln4cy.printer-hawk")

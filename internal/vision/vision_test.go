@@ -11,7 +11,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/LN4CY/printer-hawk/internal/config"
+	"github.com/ln4cy/printer-hawk/internal/config"
 )
 
 func sampleJPEG(w, h int) []byte {
